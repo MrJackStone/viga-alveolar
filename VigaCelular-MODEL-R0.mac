@@ -1,0 +1,581 @@
+!! Dados calculados                                            !!
+! Dados da abertura circular
+!   Altura da abertura
+AH=2*OpeningRad*COS(30*(3.14159/180))
+!   Projeção horizontal (em x) da face inclinada
+A1=AH/(2*(SQRT(3)))
+!   Comprimento da face horizontal
+A2=AH/(SQRT(3))
+! Espaçamento entre eixos de aberturas
+AESP=OpeningDist
+! Projeção horizontal (em x) do comprimento total de uma abertura
+ATOT=2*OpeningRad
+!   Quantidade de aberturas a ser criadas
+q1=L/AESP
+AQUANT=NINT(q1)
+*if,AQUANT,GE,q1,THEN
+   AQUANT=AQUANT-1
+*endif
+!   Posição (em x) do eixo da primeira abertura
+!     (mais próxima à face 1)
+Rem=q1-AQUANT
+P0=((A2+(Rem*AESP))/2)+A1+(A2/2)
+
+! Aceleração da gravidade
+GravitationalAcceleration=9.81
+
+
+!! Modelagem                                                   !!
+! Pré-processo
+/prep7
+SELTOL
+
+! Tipo de elemento
+ET,1,181
+
+! Propriedades do material
+MP,EX,1,ElasticModulus
+MP,PRXY,1,PoissonCoef
+MP,DENS,1,MassDensity
+
+! Seções transversais
+SECTYPE,1,SHELL,,MESA
+SECDATA,tf,1 ,,5
+SECTYPE,2,SHELL,,ALMA
+SECDATA,tw,1,,5
+! Enrijecedores
+SECTYPE,3,SHELL,,ENRIJ
+SECDATA,tStiff,1
+
+! Keypoints
+!   Face inferior
+K,1,0,0,-bf/2
+K,2,0,0,0
+K,3,0,0,bf/2
+K,4,0,d,-bf/2
+K,5,0,d,0
+K,6,0,d,bf/2
+!   Face superior
+K,7,L,0,-bf/2
+K,8,L,0,0
+K,9,L,0,bf/2
+K,10,L,d,-bf/2
+K,11,L,d,0
+K,12,L,d,bf/2
+
+! Linhas
+!   Face inferior
+L,1,2
+L,2,3
+L,4,5
+L,5,6
+L,2,5
+!   Face superior
+L,7,8
+L,8,9
+L,10,11
+L,11,12
+L,8,11
+!   Longitudinais
+L,1,7
+L,2,8
+L,3,9
+L,4,10
+L,5,11
+L,6,12
+
+! Áreas
+AL,1,12,6,11
+AL,2,13,7,12
+AL,3,15,8,14
+AL,4,16,9,15
+AL,5,12,10,15
+
+! Keypoints da primeira abertura circular
+K,13,P0-(ATOT/2),d/2,0
+K,14,P0-(A2/2),(d-AH)/2,0
+K,15,P0+(A2/2),(d-AH)/2,0
+K,16,P0+(ATOT/2),d/2,0
+K,17,P0+(A2/2),(d+AH)/2,0
+K,18,P0-(A2/2),(d+AH)/2,0
+
+! Linhas da primeira abertura circular
+LARC,13,14,15,ATOT/2
+LARC,14,15,16,ATOT/2
+LARC,15,16,17,ATOT/2
+LARC,16,17,18,ATOT/2
+LARC,17,18,13,ATOT/2
+LARC,18,13,14,ATOT/2
+
+! Área da primeira abertura circular
+ASEL,U,AREA,,ALL
+AL,17,18,19,20,21,22
+*get,CircArea,AREA,0,NUM,MIN
+
+! Copiar área da abertura circular (AQUANT vezes)
+AGEN,AQUANT,CircArea,,,AESP
+CM,CircAreas,AREA
+*get,CircACount,AREA,0,COUNT
+ALLSEL
+
+! Obter o número da área que representa a alma do perfil
+CMSEL,U,CircAreas
+ASEL,R,LOC,Z,0
+*get,WebArea,AREA,0,NUM,MIN
+ALLSEL
+
+CMSEL,S,CircAreas
+CM,TempAreas,AREA
+
+! Desativar exibição de mensagens de aviso
+/uis,MSGPOP,3
+
+! Repetir para cada área de abertura circular:
+*do,i,1,CircACount,1
+   ! Selecionar áreas
+   *get,nthArea,AREA,0,NUM,MIN
+   ASEL,A,AREA,,WebArea
+   ! Subtrair área da abertura da área da alma (boolean)
+   ASBA,WebArea,nthArea,,,DELETE
+   ! Atualizar componente
+   *get,RemAreas,AREA,0,COUNT
+   *if,RemAreas,GT,1,THEN
+      ! Selecionar área da alma (numeração alterada)
+      LSEL,S,LOC,Z,0
+      LSEL,R,LOC,Y,0
+      ASLL,S
+      ASEL,R,LOC,Z,0
+      ! Obter novamente o número da área da alma
+      *get,WebArea,AREA,0,NUM,MIN
+      CMSEL,S,TempAreas
+      ASEL,U,AREA,,nthArea
+      CM,TempAreas,AREA
+   *endif
+*enddo
+
+*if,Stiffener,EQ,1,THEN
+   *get,KCounter,KP,0,NUM,MAXD
+   KCounter=1+KCounter
+   Y0=D/2
+   KPs=
+   *dim,KPs,,6
+   *do,AbertIdx,1,AQuant,1
+      Posi=P0+((AbertIdx-1)*AEsp)
+      KPs(1)=KP(Posi-(ATOT/2),Y0,0)
+      KPs(2)=KP(Posi-(A2/2),Y0-(AH/2),0)
+      KPs(3)=KP(Posi+(A2/2),Y0-(AH/2),0)
+      KPs(4)=KP(Posi+(ATOT/2),Y0,0)
+      KPs(5)=KP(Posi+(A2/2),Y0+(AH/2),0)
+      KPs(6)=KP(Posi-(A2/2),Y0+(AH/2),0)
+      *get,KCounter,KP,0,NUM,MAXD
+      KCounter=1+KCounter
+      KPCenter=KCounter
+      KCENTER,KP,KPs(1),KPs(2),KPs(3),,KPCenter
+      XCenter=KX(KPCenter)
+      YCenter=KY(KPCenter)
+      ZCenter=KZ(KPCenter)
+      KCounter=1+KCounter
+      KSEL,ALL
+      *do,Ki,1,6,1
+         KPi=KPs(Ki)
+         *get,KPx,KP,KPi,LOC,X
+         *get,KPy,KP,KPi,LOC,Y
+         *get,KPz,KP,KPi,LOC,Z
+         KAux1=KCounter
+         K,KCounter,KPx,KPy,KPz+(bStiff/2)
+         KCounter=1+KCounter
+         KAux2=KCounter
+         K,KCounter,KPx,KPy,KPz-(bStiff/2)
+         KCounter=1+KCounter
+         L,KAux2,KPi
+         L,KPi,KAux1
+      *enddo
+      *do,ZPos,-(bStiff/2),bStiff/2,bStiff
+         KP1=KP(Posi-(ATOT/2),Y0,ZPos)
+         KP2=KP(Posi-(A2/2),Y0-(AH/2),ZPos)
+         KP3=KP(Posi+(A2/2),Y0-(AH/2),ZPos)
+         KP4=KP(Posi+(ATOT/2),Y0,ZPos)
+         KP5=KP(Posi+(A2/2),Y0+(AH/2),ZPos)
+         KP6=KP(Posi-(A2/2),Y0+(AH/2),ZPos)
+         LARC,KP1,KP2,KP3,ATOT/2
+         LARC,KP2,KP3,KP4,ATOT/2
+         LARC,KP3,KP4,KP5,ATOT/2
+         LARC,KP4,KP5,KP6,ATOT/2
+         LARC,KP5,KP6,KP1,ATOT/2
+         LARC,KP6,KP1,KP2,ATOT/2
+      *enddo
+      *do,Ki,1,6,1
+         KP1=KPs(Ki)
+         *get,KP1x,KP,KP1,LOC,X
+         *get,KP1y,KP,KP1,LOC,Y
+         *if,Ki,NE,6,THEN
+            KP2=KPs(1+Ki)
+         *else
+            KP2=KPs(1)
+         *endif
+         *get,KP2x,KP,KP2,LOC,X
+         *get,KP2y,KP,KP2,LOC,Y
+         Theta=60*(3.14159/180)
+         Radius=ATOT/2
+         ALen=Radius*(1-COS(Theta/2))
+         XA=(KP1X+KP2X)/2
+         YA=(KP1Y+KP2Y)/2
+         Alfa=ATAN((KP2Y-KP1Y)/(KP2X-KP1X))
+         ThetaP=Alfa+(0.5*3.14159)
+         Fac=1
+         *if,YA-YCenter,LT,0,THEN
+            Fac=-1
+         *endif
+         XArcCen=XA+(Fac*ALen*COS(ThetaP))
+         YArcCen=YA+(Fac*ALen*SIN(ThetaP))
+         LSEL,S,LOC,X,XArcCen
+         LSEL,R,LOC,Y,YArcCen
+         LSEL,R,LOC,Z,bStiff/2
+         *get,LINE1,LINE,0,NUM,MIN
+         LSEL,S,LOC,X,XArcCen
+         LSEL,R,LOC,Y,YArcCen
+         LSEL,R,LOC,Z,0
+         *get,LINE2,LINE,0,NUM,MIN
+         LSEL,S,LOC,X,XArcCen
+         LSEL,R,LOC,Y,YArcCen
+         LSEL,R,LOC,Z,-bStiff/2
+         *get,LINE3,LINE,0,NUM,MIN
+         LSEL,S,LOC,X,KP1x
+         LSEL,R,LOC,Y,KP1y
+         LSEL,R,LOC,Z,bStiff/4
+         *get,LINE4,LINE,0,NUM,MIN
+         LSEL,S,LOC,X,KP1x
+         LSEL,R,LOC,Y,KP1y
+         LSEL,R,LOC,Z,-bStiff/4
+         *get,LINE5,LINE,0,NUM,MIN
+         LSEL,S,LOC,X,KP2x
+         LSEL,R,LOC,Y,KP2y
+         LSEL,R,LOC,Z,bStiff/4
+         *get,LINE6,LINE,0,NUM,MIN
+         LSEL,S,LOC,X,KP2x
+         LSEL,R,LOC,Y,KP2y
+         LSEL,R,LOC,Z,-bStiff/4
+         *get,LINE7,LINE,0,NUM,MIN
+         ALLSEL
+         AL,LINE1,LINE6,LINE2,LINE4
+         AL,LINE2,LINE7,LINE3,LINE5
+      *enddo
+      KDELE,KPCenter
+   *enddo
+*endif
+
+! Atributos das áreas
+ASEL,S,LOC,Y,0
+ASEL,A,LOC,Y,d
+AATT,1,,1,,1
+ASEL,INVE
+AATT,1,,1,,2
+
+*if,Stiffener,EQ,1,THEN
+   ! Atributos dos enrijecedores
+   ALLSEL
+   ASEL,U,LOC,Y,d
+   ASEL,U,LOC,Y,0
+   ASEL,U,LOC,Z,0
+   AATT,1,,1,,3
+*endif
+
+! Criar malha
+ALLSEL
+AESIZE,ALL,ElementSize
+AMESH,ALL
+
+! Desativar exibição de mensagens de aviso
+/uis,MSGPOP,2
+
+! Apoio esquerdo
+*if,LeftSupport,EQ,1,THEN
+   LSEL,S,LOC,X,0
+   LSEL,R,LOC,Y,d/2
+   NSLL,S,1
+   D,ALL,UY,0,,,,UZ
+   NSEL,R,LOC,Y,0
+   D,ALL,UX,0
+*elseif,LeftSupport,EQ,2,THEN
+   LSEL,S,LOC,X,0
+   NSLL,S,1
+   D,ALL,UX,0,,,,UY,UZ
+*endif
+! Apoio direito
+*if,RightSupport,EQ,1,THEN
+   LSEL,S,LOC,X,L
+   LSEL,R,LOC,Y,d/2
+   NSLL,S,1
+   D,ALL,UY,0,,,,UZ
+   NSEL,R,LOC,Y,0
+   D,ALL,UX,0
+*elseif,RightSupport,EQ,2,THEN
+   LSEL,S,LOC,X,L
+   NSLL,S,1
+   D,ALL,UX,0,,,,UY,UZ
+*endif
+
+! Vista isométrica
+/view,1,1,1,1
+/auto,ALL
+/pnum,SEC,1
+/number,1
+/eshape,1
+EPLOT
+
+!!
+!!
+!!
+
+*if,AnalysisMode,EQ,1,THEN
+
+*msg,UI,'Modo de análise: pequenas deformações.'
+%38C
+
+   !! Pré-processo                                                !!
+   ! Propriedades do material
+   TB,BISO,1,1,2
+   TBTEMP,0
+   TBDATA,,YieldStress,0
+
+   ! Carga
+   *if,Gravity,EQ,1,THEN
+      ACEL,,GravitationalAcceleration
+   *endif
+   LSEL,S,LOC,Y,d
+   LSEL,R,LOC,Z,0
+   NSLL,S,1
+   *get,NodeCount,NODE,0,COUNT
+   NodalLoad=-(Load*L)/NodeCount
+   F,ALL,FY,NodalLoad
+   ALLSEL
+   !! Solução                                                     !!
+   /solu
+   ANTYPE,STATIC,NEW
+   NSUBST,SubstepNumber,SubstepNumber*2,SubstepNumber/2
+   NLGEOM,OFF
+   OUTRES,ERASE
+   OUTRES,ALL,ALL
+   SOLVE
+   !! Pós-processo                                                !!
+   /post1
+   ! Ler o último set que atingiu convergência
+   SET,LAST
+   CHECK=1
+   *dowhile,CHECK
+      *get,ConvCheck,ACTIVE,,SOLU,CNVG
+      *get,SetNumber,ACTIVE,,SET,SBST
+      *if,ConvCheck,EQ,1,OR,SetNumber,EQ,1,THEN
+         CHECK=0
+      *else
+         SET,PREV
+      *endif
+   *enddo
+
+   ! Plotar tensões de Von Mises
+   /gline,,-1
+   /dscale,1,AUTO
+   PLNSOL,S,EQV
+
+*elseif,AnalysisMode,EQ,2,THEN
+
+*msg,UI,'Modo de análise: grandes deformações.'
+%45C
+
+   !! Pré-processo                                                !!
+   ! Propriedades do material
+   TB,BISO,1,1,2
+   TBTEMP,0
+   TBDATA,,YieldStress,0
+
+   ! Carga
+   *if,Gravity,EQ,1,THEN
+      ACEL,,GravitationalAcceleration
+   *endif
+   LSEL,S,LOC,Y,d
+   LSEL,R,LOC,Z,0
+   NSLL,S,1
+   *get,NodeCount,NODE,0,COUNT
+   NodalLoad=-(Load*L)/NodeCount
+   F,ALL,FY,NodalLoad
+   ALLSEL
+   !! Solução                                                     !!
+   /solu
+   ANTYPE,STATIC,NEW
+   NSUBST,SubstepNumber,SubstepNumber*2,SubstepNumber/2
+   NLGEOM,ON
+   OUTRES,ERASE
+   OUTRES,ALL,ALL
+   SOLVE
+   !! Pós-processo                                                !!
+   /post1
+   ! Ler o último set que atingiu convergência
+   SET,LAST
+   CHECK=1
+   *dowhile,CHECK
+      *get,ConvCheck,ACTIVE,,SOLU,CNVG
+      *get,SetNumber,ACTIVE,,SET,SBST
+      *if,ConvCheck,EQ,1,OR,SetNumber,EQ,1,THEN
+         CHECK=0
+      *else
+         SET,PREV
+      *endif
+   *enddo
+
+   ! Plotar tensões de Von Mises
+   /gline,,-1
+   /dscale,1,AUTO
+   PLNSOL,S,EQV
+
+*elseif,AnalysisMode,EQ,3,THEN
+
+*msg,UI,'Modo de análise: flambagem.'
+%27C
+
+   !! Pré-processo                                                !!
+   ! Carga
+   *if,Gravity,EQ,1,THEN
+      ACEL,,GravitationalAcceleration
+   *endif
+   LSEL,S,LOC,Y,d
+   LSEL,R,LOC,Z,0
+   NSLL,S,1
+   *get,NodeCount,NODE,0,COUNT
+   NodalLoad=-(Load*L)/NodeCount
+   F,ALL,FY,NodalLoad
+   ALLSEL
+   !! Solução (análise estática, PSTRES,ON)                       !!
+   /solu
+   ANTYPE,STATIC,NEW
+   NSUBST,1
+   PSTRES,ON
+   NLGEOM,OFF
+   SOLVE
+   !! Pós-processo (análise estática)                             !!
+   /post1
+   SET,LAST
+   !! Solução (análise de flambagem)                              !!
+   /solu
+   ANTYPE,BUCKLE
+   BUCOPT,LANB,BucklingModes,0,0,RANGE
+   MXPAND,BucklingModes,0,0,1,0.001
+   SOLVE
+   !! Pós-processo (análise de flambagem)                         !!
+   /post1
+   SET,FIRST
+   PLDISP
+
+*elseif,AnalysisMode,EQ,4,THEN
+
+*msg,UI,'Modo de análise: imperfeições iniciais.'
+%39C
+
+   !! Pré-processo                                                !!
+   ! Carga
+   *if,Gravity,EQ,1,THEN
+      ACEL,,GravitationalAcceleration
+   *endif
+   LSEL,S,LOC,Y,d
+   LSEL,R,LOC,Z,0
+   NSLL,S,1
+   *get,NodeCount,NODE,0,COUNT
+   NodalLoad=-(Load*L)/NodeCount
+   F,ALL,FY,NodalLoad
+   ALLSEL
+   !! Solução (análise estática, PSTRES,ON)                       !!
+   /solu
+   ANTYPE,STATIC,NEW
+   NSUBST,1
+   PSTRES,ON
+   NLGEOM,OFF
+   SOLVE
+   !! Pós-processo (análise estática)                             !!
+   /post1
+   SET,LAST
+   !! Solução (análise de flambagem)                              !!
+   /solu
+   ANTYPE,BUCKLE
+   BUCOPT,LANB,2,0,0,RANGE
+   MXPAND,2,0,0,1,0.001
+   SOLVE
+   !! Pós-processo (análise de flambagem)                         !!
+   /post1
+   SET,FIRST
+   PLDISP
+   ! Obter deslocamento máximo
+   ALLSEL
+   *get,NodeCount,NODE,0,COUNT
+   *del,NodalDisplacements
+   *dim,NodalDisplacements,ARRAY,NodeCount
+   *do,NodeIndex,1,NodeCount,1
+      *get,nthNode,NODE,0,NUM,MIN
+      *get,NodeDisp,NODE,nthNode,U,SUM
+      NodalDisplacements(NodeIndex)=NodeDisp
+      NSEL,U,NODE,,nthNode
+   *enddo
+   *vscfun,MaxDisplacement,MAX,NodalDisplacements
+   ALLSEL
+   !! Pré-processo                                                !!
+   /prep7
+   ! Propriedades do material
+   TB,BISO,1,1,2
+   TBTEMP,0
+   TBDATA,,YieldStress,0
+
+   ! Obter nome do arquivo
+   *get,CurrentJobName,ACTIVE,0,JOBNAM
+
+   ! Importar geometria deformada
+   UPGEOM,L/InitialImperfection*MaxDisplacement,1,1,%CurrentJobName%,RST
+   !! Solução (análise estática não linear com imperfeições)      !!
+   /solu
+   ANTYPE,0
+   NSUBST,SubstepNumber,SubstepNumber*2,SubstepNumber/2
+   NLGEOM,ON
+   OUTRES,ERASE
+   OUTRES,ALL,ALL
+   SOLVE
+   !! Pós-processo                                                !!
+   /post1
+   ! Ler o último set que atingiu convergência
+   SET,LAST
+   CHECK=1
+   *dowhile,CHECK
+      *get,ConvCheck,ACTIVE,,SOLU,CNVG
+      *get,SetNumber,ACTIVE,,SET,SBST
+      *if,ConvCheck,EQ,1,OR,SetNumber,EQ,1,THEN
+         CHECK=0
+      *else
+         SET,PREV
+      *endif
+   *enddo
+
+   ! Plotar tensões de Von Mises
+   /gline,,-1
+   /dscale,1,AUTO
+   PLNSOL,S,EQV
+
+*elseif,AnalysisMode,EQ,5,THEN
+
+*msg,UI,'Modo de análise: modal.'
+%23C
+
+   !! Solução (análise modal)                                     !!
+   /solu
+   ALLSEL
+   ! Nova análise modal
+   ANTYPE,MODAL,NEW
+   MODOPT,LANB,VibrationModes
+   SOLVE
+   !! Pós-processo (análise modal)                                !!
+   /post1
+   SET,FIRST
+   PLDISP
+
+*else
+
+*msg,UI,'Modo de análise não reconhecido. Favor verificar o valor da variável AnalysisMode.'
+%82C
+
+*endif
+

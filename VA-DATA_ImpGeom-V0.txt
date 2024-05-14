@@ -1,0 +1,36 @@
+! VA-DATA_ImpGeom-V0.txt
+! ImpGeom
+! Fator L/500
+! Versão: 0
+! --- | --- (---)
+! Autor: Felipe
+! Responsável: Felipe
+! Data: 26/02/15 (18:56:14)
+
+d=228e-3
+bf=100e-3
+tf=4.9e-3
+tw=4.3e-3
+L=6.5e0
+LeftSupport=2
+RightSupport=1
+
+ElasticModulus=200e9
+PoissonCoef=0.3
+YieldStress=345e6
+MassDensity=7850
+Load=9.4e3
+
+OpeningHeight=80e-3
+OpeningWidth=284.920080548872e-3
+OpeningAngle=120
+OpeningDist=320e-3
+Stiffener=1
+bStiff=20e-3
+tStiff=5e-3
+
+Gravity=1
+SubstepNumber=50
+ElementSize=25e-3
+AnalysisMode=4
+InitialImperfection=500

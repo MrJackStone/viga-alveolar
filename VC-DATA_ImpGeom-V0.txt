@@ -1,0 +1,36 @@
+! VC-DATA_ImpGeom-V0.txt
+! ImpGeom
+! Grandes Deslocamentos
+! Versão: 0
+! Construtora | Galpão (098-003)
+! Autor: Felipe
+! Responsável: Felipe
+! Data: 26/02/15 (18:41:08)
+
+d=228e-3
+bf=100e-3
+tf=4.9e-3
+tw=4.3e-3
+L=6.5e0
+
+ElasticModulus=200e9
+PoissonCoef=0.3
+YieldStress=345e6
+MassDensity=7850
+
+Load=9.4e3
+Gravity=1
+
+OpeningRad=40e-3
+OpeningDist=120e-3
+Stiffener=1
+bStiff=40e-3
+tStiff=5e-3
+
+SubstepNumber=50
+ElementSize=15e-3
+AnalysisMode=2
+
+
+LeftSupport=2
+RightSupport=1
